@@ -188,6 +188,10 @@ body {
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
+.task-card-done {
+  /* Keep the card neutral; completion is represented by checkbox + title strike. */
+}
+
 .task-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 16px 28px rgba(31, 58, 46, 0.12), 0 3px 10px rgba(31, 58, 46, 0.08);
@@ -288,6 +292,30 @@ body {
   border-color: #d99b6c;
 }
 
+.undo-link {
+  background: transparent;
+  border: 0;
+  padding: 8px 4px;
+  cursor: pointer;
+  color: #8a8a85;
+  font-weight: 800;
+  font-size: 12px;
+  transition: transform 180ms ease, color 180ms ease, opacity 180ms ease;
+}
+
+.undo-link:hover {
+  color: #1f3a2e;
+}
+
+.undo-link:active {
+  transform: scale(0.95);
+}
+
+.undo-link:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .adjusted-banner {
   margin-top: 8px;
   border-radius: 16px;
@@ -299,6 +327,14 @@ body {
   margin: 0;
   font-size: 14px;
   color: #1f3a2e;
+}
+
+.help-guidance-text {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(31, 58, 46, 0.92);
+  white-space: pre-wrap;
 }
 
 .adjusted-label {

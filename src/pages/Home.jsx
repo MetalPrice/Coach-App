@@ -21,7 +21,8 @@ export default function Home() {
   const [tasksLoading, setTasksLoading] = useState(true)
   const [latestLine, setLatestLine] = useState('')
   const [helpedTaskId, setHelpedTaskId] = useState(null)
-  const [adjustedDone, setAdjustedDone] = useState({})
+  const [helpLoadingTaskId, setHelpLoadingTaskId] = useState(null)
+  const [undoLoadingTaskId, setUndoLoadingTaskId] = useState(null)
 
   const mediaRecorderRef = useRef(null)
   const mediaStreamRef = useRef(null)
@@ -38,7 +39,7 @@ export default function Home() {
 
     const { data, error } = await supabase
       .from('tasks')
-      .select('id, title, description, status')
+      .select('id, title, description, status, is_downgraded, reframe_message, guidance')
       .eq('coachee_id', user.id)
       .order('created_at', { ascending: true })
 
@@ -232,6 +233,80 @@ export default function Home() {
   const messageLine =
     latestLine || 'Your daily voice check-in helps us shape the next best step.'
 
+  const hasHelpGuidance = (task) => {
+    return Boolean(task?.is_downgraded) || Boolean(task?.reframe_message) || Boolean(task?.guidance)
+  }
+
+  const requestHelpForTask = async (task) => {
+    if (!task?.id || !user?.id) return
+    setHelpLoadingTaskId(task.id)
+    try {
+      const { data, error } = await supabase.functions.invoke('downgrade-task', {
+        body: {
+          id: task.id,
+          title: task.title,
+          description: task.description,
+        },
+      })
+
+      if (error) throw error
+
+      const updatedTask = data?.task ?? null
+
+      if (updatedTask) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === task.id ? { ...t, ...updatedTask } : t))
+        )
+      } else {
+        // Fallback: ensure UI has something to render
+        if (data?.guidance?.reframe_message || data?.guidance?.guidance) {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === task.id
+                ? {
+                    ...t,
+                    is_downgraded: true,
+                    reframe_message: data.guidance.reframe_message,
+                    guidance: data.guidance.guidance,
+                  }
+                : t
+            )
+          )
+        }
+      }
+
+      setHelpedTaskId(task.id)
+    } catch (err) {
+      console.error('Failed to request guidance:', err)
+    } finally {
+      setHelpLoadingTaskId(null)
+    }
+  }
+
+  const undoTask = async (taskId) => {
+    if (!taskId || !user?.id) return
+    setUndoLoadingTaskId(taskId)
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'active' })
+        .eq('id', taskId)
+        .eq('coachee_id', user.id)
+
+      if (error) throw error
+
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status: 'active' } : t))
+      )
+
+      if (helpedTaskId === taskId) setHelpedTaskId(null)
+    } catch (err) {
+      console.error('Failed to undo task:', err)
+    } finally {
+      setUndoLoadingTaskId(null)
+    }
+  }
+
   return (
     <div className="screen">
       <div className="screen-content">
@@ -288,8 +363,10 @@ export default function Home() {
         {!tasksLoading &&
           tasks.map((task, index) => {
             const isDone = String(task.status).toLowerCase() === 'done'
-            const isHelpState = helpedTaskId === task.id
-            const isAdjustedDone = !!adjustedDone[task.id]
+            const hasGuidance = hasHelpGuidance(task)
+            const helpJustRequested = helpedTaskId === task.id
+            const canShowHelp = !isDone && !hasGuidance
+            const showHelpBanner = hasGuidance
 
             return (
               <article
@@ -297,13 +374,25 @@ export default function Home() {
                 key={task.id}
                 style={{ animationDelay: `${index * 80}ms` }}
               >
-                <div className={`task-card ${isDone || isHelpState ? 'task-card-done' : ''}`}>
+                <div
+                  className={`task-card ${
+                    isDone || helpJustRequested ? 'task-card-done' : ''
+                  }`}
+                >
                   <div className="task-left">
-                    <span className={`task-check ${isDone || isHelpState ? 'checked' : ''}`}>
-                      {isDone || isHelpState ? '✓' : '○'}
+                    <span
+                      className={`task-check ${
+                        isDone || helpJustRequested ? 'checked' : ''
+                      }`}
+                    >
+                      {isDone || helpJustRequested ? '✓' : '○'}
                     </span>
                     <div>
-                      <p className={`task-title ${isDone || isHelpState ? 'strike' : ''}`}>
+                      <p
+                        className={`task-title ${
+                          isDone || helpJustRequested ? 'strike' : ''
+                        }`}
+                      >
                         <span className="task-title-text">{task.title}</span>
                       </p>
                       <p className="task-subtitle">{task.description || 'Small consistent progress.'}</p>
@@ -311,34 +400,43 @@ export default function Home() {
                   </div>
 
                   <div className="task-actions">
-                    <button className="pill-done" onClick={() => markTaskDone(task.id)}>
-                      Done
-                    </button>
-                    <button className="pill-help" onClick={() => setHelpedTaskId(task.id)}>
-                      Help
-                    </button>
+                    {isDone ? (
+                      <button
+                        type="button"
+                        className="undo-link"
+                        onClick={() => undoTask(task.id)}
+                        disabled={undoLoadingTaskId === task.id}
+                      >
+                        {undoLoadingTaskId === task.id ? 'Undoing…' : 'Undo'}
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          className="pill-done"
+                          onClick={() => markTaskDone(task.id)}
+                        >
+                          Done
+                        </button>
+                        {canShowHelp ? (
+                          <button
+                            className="pill-help"
+                            onClick={() => requestHelpForTask(task)}
+                            disabled={helpLoadingTaskId === task.id}
+                          >
+                            {helpLoadingTaskId === task.id ? 'Help…' : 'Help'}
+                          </button>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {isHelpState ? (
+                {helpJustRequested || showHelpBanner ? (
                   <div className="adjusted-banner">
-                    <p className="adjusted-message">❤ My fault, that plan was too hard.</p>
-                    <p className="adjusted-label">ADJUSTED STEP</p>
-                    <div className="adjusted-row">
-                      <p className="adjusted-task">
-                        {isAdjustedDone
-                          ? 'Great job finishing the adjusted step.'
-                          : 'Set a 2-minute timer and do the easiest version right now.'}
-                      </p>
-                      <button
-                        className="pill-done"
-                        onClick={() =>
-                          setAdjustedDone((prev) => ({ ...prev, [task.id]: true }))
-                        }
-                      >
-                        Done
-                      </button>
-                    </div>
+                    <p className="adjusted-message">{task.reframe_message || 'Let’s break it down instead of skipping it.'}</p>
+                    {task.guidance ? (
+                      <p className="help-guidance-text">{task.guidance}</p>
+                    ) : null}
                   </div>
                 ) : null}
               </article>
