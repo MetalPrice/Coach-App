@@ -423,3 +423,25 @@ entrypoint = "./functions/transcribe-entry/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/transcribe-entry/*.html" ]
+
+[functions.extract-pdf]
+enabled = true
+verify_jwt = false
+import_map = "./functions/extract-pdf/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/extract-pdf/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/extract-pdf/*.html" ]
+
+[functions.extract-tasks]
+enabled = true
+verify_jwt = false
+import_map = "./functions/extract-tasks/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/extract-tasks/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/extract-tasks/*.html" ]
