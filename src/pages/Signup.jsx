@@ -39,12 +39,14 @@ export default function Signup() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: '40px auto', padding: 16 }}>
-      <h2>Sign up</h2>
-      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 12 }}>
-        <label style={{ display: 'grid', gap: 6 }}>
+    <div className="auth-screen">
+      <h1 className="auth-title">Create account</h1>
+      <p className="auth-subtitle">Start your daily check-ins in under a minute.</p>
+      <form onSubmit={onSubmit} className="auth-form">
+        <label className="auth-label">
           <span>Name</span>
           <input
+            className="auth-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -52,9 +54,10 @@ export default function Signup() {
           />
         </label>
 
-        <label style={{ display: 'grid', gap: 6 }}>
+        <label className="auth-label">
           <span>Email</span>
           <input
+            className="auth-input"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -63,9 +66,10 @@ export default function Signup() {
           />
         </label>
 
-        <label style={{ display: 'grid', gap: 6 }}>
+        <label className="auth-label">
           <span>Password</span>
           <input
+            className="auth-input"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -75,16 +79,19 @@ export default function Signup() {
           />
         </label>
 
-        <button type="submit" disabled={submitting}>
+        <button className="auth-primary-btn" type="submit" disabled={submitting}>
           {submitting ? 'Creating account…' : 'Create account'}
         </button>
 
-        {error ? <p style={{ color: 'crimson' }}>{error}</p> : null}
-        {message ? <p>{message}</p> : null}
+        {error ? <p className="auth-error">{error}</p> : null}
+        {message ? <p className="auth-ok">{message}</p> : null}
       </form>
 
-      <p style={{ marginTop: 16 }}>
-        Already have an account? <Link to="/login">Log in</Link>
+      <p className="auth-footer">
+        Already have an account?{' '}
+        <Link className="auth-link" to="/login">
+          Log in
+        </Link>
       </p>
     </div>
   )

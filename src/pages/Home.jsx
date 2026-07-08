@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../auth/useAuth'
 
 function formatTimer(totalSeconds) {
   const mins = Math.floor(totalSeconds / 60)
@@ -8,17 +10,74 @@ function formatTimer(totalSeconds) {
 }
 
 export default function Home() {
+  const { user } = useAuth()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [tasks, setTasks] = useState([])
+  const [tasksLoading, setTasksLoading] = useState(true)
+  const [latestLine, setLatestLine] = useState('')
+  const [helpedTaskId, setHelpedTaskId] = useState(null)
+  const [adjustedDone, setAdjustedDone] = useState({})
 
   const mediaRecorderRef = useRef(null)
   const mediaStreamRef = useRef(null)
   const chunksRef = useRef([])
   const timerIntervalRef = useRef(null)
+
+  const displayName = useMemo(() => {
+    return user?.user_metadata?.name || user?.email?.split('@')[0] || 'there'
+  }, [user])
+
+  const loadTasks = useCallback(async () => {
+    if (!user?.id) return
+    setTasksLoading(true)
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('id, title, description, status')
+      .eq('coachee_id', user.id)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.error('Failed to load tasks:', error)
+      setTasks([])
+    } else {
+      setTasks(data || [])
+    }
+
+    setTasksLoading(false)
+  }, [user?.id])
+
+  const loadLatestEntry = useCallback(async () => {
+    if (!user?.id) return
+
+    const { data, error } = await supabase
+      .from('entries')
+      .select('transcript')
+      .eq('coachee_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Failed to load latest entry:', error)
+      setLatestLine('')
+      return
+    }
+
+    const transcript = data?.transcript?.trim()
+    if (!transcript) {
+      setLatestLine('')
+      return
+    }
+
+    const normalized = transcript.replace(/\s+/g, ' ')
+    setLatestLine(normalized.length > 92 ? `${normalized.slice(0, 92)}...` : normalized)
+  }, [user?.id])
 
   const stopTimer = () => {
     if (timerIntervalRef.current) {
@@ -33,6 +92,12 @@ export default function Home() {
       mediaStreamRef.current = null
     }
   }
+
+  useEffect(() => {
+    if (!user?.id) return
+    loadTasks()
+    loadLatestEntry()
+  }, [user?.id, loadLatestEntry, loadTasks])
 
   useEffect(() => {
     return () => {
@@ -132,6 +197,7 @@ export default function Home() {
         }
 
         setStatusMessage('Transcript saved successfully.')
+        await loadLatestEntry()
       } catch (error) {
         console.error('Failed to process recording:', error)
         setErrorMessage('Something went wrong while processing your recording.')
@@ -146,72 +212,188 @@ export default function Home() {
     recorder.stop()
   }
 
-  return (
-    <div style={{ maxWidth: 720, margin: '40px auto', padding: 16 }}>
-      <h2>Home (Coachee)</h2>
+  const markTaskDone = async (taskId) => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: 'done' })
+      .eq('id', taskId)
+      .eq('coachee_id', user.id)
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <button onClick={openRecorderModal}>Record Your Day</button>
-        <button onClick={() => supabase.auth.signOut()}>Sign out</button>
+    if (error) {
+      console.error('Failed to update task status:', error)
+      return
+    }
+
+    setTasks((prev) =>
+      prev.map((task) => (task.id === taskId ? { ...task, status: 'done' } : task))
+    )
+  }
+
+  const messageLine =
+    latestLine || 'Your daily voice check-in helps us shape the next best step.'
+
+  return (
+    <div className="screen">
+      <div className="screen-content">
+        <header className="row-between">
+          <div>
+            <h1 className="screen-title">Good morning, {displayName} ✨</h1>
+            <p className="muted-line">{messageLine}</p>
+          </div>
+          <button className="icon-button" aria-label="Notifications">
+            ⊙
+          </button>
+        </header>
+
+        <button className="record-card" onClick={openRecorderModal}>
+          <span className="record-icon">●</span>
+          <div>
+            <p className="record-title">Record Your Day</p>
+            <p className="record-subtitle">TAP TO TALK. I&apos;M HERE TO LISTEN.</p>
+          </div>
+        </button>
+
+        <section className="focus-banner">
+          <span>◌</span>
+          <p>
+            <strong>Focus for Today:</strong> Complete one small thing before noon.
+          </p>
+        </section>
+
+        <div className="row-between section-head">
+          <h2 className="section-title">Your 3-Step Plan</h2>
+          <button className="ghost-button" onClick={() => supabase.auth.signOut()}>
+            Sign out
+          </button>
+        </div>
+
+        {tasksLoading ? <p className="muted-line">Loading your tasks...</p> : null}
+
+        {!tasksLoading && tasks.length === 0 ? (
+          <p className="muted-line">No tasks yet. Your coach will add your first steps soon.</p>
+        ) : null}
+
+        {!tasksLoading &&
+          tasks.map((task) => {
+            const isDone = String(task.status).toLowerCase() === 'done'
+            const isHelpState = helpedTaskId === task.id
+            const isAdjustedDone = !!adjustedDone[task.id]
+
+            return (
+              <article className="task-wrap" key={task.id}>
+                <div className={`task-card ${isDone || isHelpState ? 'task-card-done' : ''}`}>
+                  <div className="task-left">
+                    <span className="task-check">{isDone || isHelpState ? '✓' : '○'}</span>
+                    <div>
+                      <p className={`task-title ${isDone || isHelpState ? 'strike' : ''}`}>
+                        {task.title}
+                      </p>
+                      <p className="task-subtitle">{task.description || 'Small consistent progress.'}</p>
+                    </div>
+                  </div>
+
+                  <div className="task-actions">
+                    <button className="pill-done" onClick={() => markTaskDone(task.id)}>
+                      Done
+                    </button>
+                    <button className="pill-help" onClick={() => setHelpedTaskId(task.id)}>
+                      Help
+                    </button>
+                  </div>
+                </div>
+
+                {isHelpState ? (
+                  <div className="adjusted-banner">
+                    <p className="adjusted-message">❤ My fault, that plan was too hard.</p>
+                    <p className="adjusted-label">ADJUSTED STEP</p>
+                    <div className="adjusted-row">
+                      <p className="adjusted-task">
+                        {isAdjustedDone
+                          ? 'Great job finishing the adjusted step.'
+                          : 'Set a 2-minute timer and do the easiest version right now.'}
+                      </p>
+                      <button
+                        className="pill-done"
+                        onClick={() =>
+                          setAdjustedDone((prev) => ({ ...prev, [task.id]: true }))
+                        }
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </article>
+            )
+          })}
       </div>
 
       {isModalOpen ? (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.55)',
-            display: 'grid',
-            placeItems: 'center',
-            padding: 16,
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: 460,
-              borderRadius: 12,
-              padding: 20,
-              background: '#202020',
-              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.35)',
-            }}
-          >
-            <h3 style={{ marginTop: 0 }}>Record Your Day</h3>
-
-            <p style={{ marginBottom: 8 }}>
-              {isRecording ? 'Recording in progress' : 'Ready to record'}
-            </p>
-            <p style={{ fontSize: 28, marginTop: 0, marginBottom: 16 }}>
-              {formatTimer(recordingSeconds)}
-            </p>
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              {!isRecording ? (
-                <button onClick={startRecording} disabled={isSubmitting}>
-                  Start Recording
-                </button>
-              ) : (
-                <button onClick={finishRecording} disabled={isSubmitting}>
-                  Finish
-                </button>
-              )}
-
-              <button onClick={closeRecorderModal} disabled={isRecording || isSubmitting}>
-                Close
+        <div className="recording-overlay">
+          <div className="recording-shell">
+            <div className="row-between">
+              <button className="overlay-icon-btn" onClick={closeRecorderModal}>
+                ✕
               </button>
+              <span className="private-pill">🔒 Private &amp; Secure</span>
             </div>
 
-            {isSubmitting ? (
-              <p style={{ marginTop: 12 }}>Working...</p>
-            ) : null}
-            {statusMessage ? <p style={{ marginTop: 12 }}>{statusMessage}</p> : null}
-            {errorMessage ? (
-              <p style={{ marginTop: 12, color: '#ff8b8b' }}>{errorMessage}</p>
-            ) : null}
+            <div className="recording-center">
+              <h3>I&apos;m listening...</h3>
+              <p>Speak freely. It stays between us.</p>
+
+              <button
+                className={`mic-circle ${isRecording ? 'pulse' : ''}`}
+                onClick={isRecording ? finishRecording : startRecording}
+                disabled={isSubmitting}
+              >
+                🎤
+              </button>
+
+              <div className="wave-bars">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+
+              <p className="timer-text">{formatTimer(recordingSeconds)}</p>
+              <p className="recording-text">
+                {isRecording ? 'Recording in progress' : 'Tap mic to start recording'}
+              </p>
+              {statusMessage ? <p className="status-light">{statusMessage}</p> : null}
+              {errorMessage ? <p className="status-error">{errorMessage}</p> : null}
+            </div>
+
+            <div className="overlay-actions">
+              <button
+                className="overlay-cancel"
+                onClick={closeRecorderModal}
+                disabled={isRecording || isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className="overlay-finish"
+                onClick={finishRecording}
+                disabled={!isRecording || isSubmitting}
+              >
+                {isSubmitting ? 'Saving...' : 'Finish'}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
+
+      <div className="bottom-nav">
+        <Link className="bottom-nav-link active" to="/home">
+          Home
+        </Link>
+        <Link className="bottom-nav-link" to="/library">
+          Library
+        </Link>
+      </div>
     </div>
   )
 }

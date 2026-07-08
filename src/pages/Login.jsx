@@ -74,12 +74,14 @@ export default function Login() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: '40px auto', padding: 16 }}>
-      <h2>Log in</h2>
-      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 12 }}>
-        <label style={{ display: 'grid', gap: 6 }}>
+    <div className="auth-screen">
+      <h1 className="auth-title">Welcome back</h1>
+      <p className="auth-subtitle">Log in to continue your coaching journey.</p>
+      <form onSubmit={onSubmit} className="auth-form">
+        <label className="auth-label">
           <span>Email</span>
           <input
+            className="auth-input"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -88,9 +90,10 @@ export default function Login() {
           />
         </label>
 
-        <label style={{ display: 'grid', gap: 6 }}>
+        <label className="auth-label">
           <span>Password</span>
           <input
+            className="auth-input"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -99,15 +102,18 @@ export default function Login() {
           />
         </label>
 
-        <button type="submit" disabled={submitting}>
+        <button className="auth-primary-btn" type="submit" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Log in'}
         </button>
 
-        {error ? <p style={{ color: 'crimson' }}>{error}</p> : null}
+        {error ? <p className="auth-error">{error}</p> : null}
       </form>
 
-      <p style={{ marginTop: 16 }}>
-        New here? <Link to="/signup">Create an account</Link>
+      <p className="auth-footer">
+        New here?{' '}
+        <Link className="auth-link" to="/signup">
+          Create an account
+        </Link>
       </p>
     </div>
   )
