@@ -1,18 +1,6 @@
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-
-function BottomNav() {
-  return (
-    <div className="bottom-nav">
-      <Link className="bottom-nav-link" to="/home">
-        Home
-      </Link>
-      <Link className="bottom-nav-link active" to="/library">
-        Library
-      </Link>
-    </div>
-  )
-}
+import BottomNav from '../components/BottomNav'
 
 export default function LibraryConnection() {
   return (
@@ -53,23 +41,23 @@ export default function LibraryConnection() {
 
         <h2 className="section-title journey-title">Your Journey</h2>
 
-        <button className="journey-row">
+        <Link className="journey-row" to="/journal">
           <div className="journey-icon">◌</div>
           <div>
             <p className="journey-row-title">Reflection Journal</p>
             <p className="journey-row-subtitle">Capture thoughts and emotions</p>
           </div>
           <span className="journey-arrow">›</span>
-        </button>
+        </Link>
 
-        <button className="journey-row">
+        <Link className="journey-row" to="/progress">
           <div className="journey-icon">◍</div>
           <div>
             <p className="journey-row-title">View History</p>
             <p className="journey-row-subtitle">Review your progress timeline</p>
           </div>
           <span className="journey-arrow">›</span>
-        </button>
+        </Link>
       </div>
       <BottomNav />
     </div>

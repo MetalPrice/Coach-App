@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../auth/useAuth'
+import BottomNav from '../components/BottomNav'
 
 function formatTimer(totalSeconds) {
   const mins = Math.floor(totalSeconds / 60)
@@ -267,26 +267,44 @@ export default function Home() {
           </button>
         </div>
 
-        {tasksLoading ? <p className="muted-line">Loading your tasks...</p> : null}
+        {tasksLoading ? (
+          <div className="skeleton-stack">
+            <div className="skeleton-task" />
+            <div className="skeleton-task" />
+            <div className="skeleton-task" />
+          </div>
+        ) : null}
 
         {!tasksLoading && tasks.length === 0 ? (
-          <p className="muted-line">No tasks yet. Your coach will add your first steps soon.</p>
+          <div className="empty-state">
+            <div className="empty-icon">✦</div>
+            <p className="empty-title">
+              Your coach is reviewing your latest entry - check back soon
+            </p>
+            <p className="empty-text">You are doing great by showing up today.</p>
+          </div>
         ) : null}
 
         {!tasksLoading &&
-          tasks.map((task) => {
+          tasks.map((task, index) => {
             const isDone = String(task.status).toLowerCase() === 'done'
             const isHelpState = helpedTaskId === task.id
             const isAdjustedDone = !!adjustedDone[task.id]
 
             return (
-              <article className="task-wrap" key={task.id}>
+              <article
+                className="task-wrap task-entrance"
+                key={task.id}
+                style={{ animationDelay: `${index * 80}ms` }}
+              >
                 <div className={`task-card ${isDone || isHelpState ? 'task-card-done' : ''}`}>
                   <div className="task-left">
-                    <span className="task-check">{isDone || isHelpState ? '✓' : '○'}</span>
+                    <span className={`task-check ${isDone || isHelpState ? 'checked' : ''}`}>
+                      {isDone || isHelpState ? '✓' : '○'}
+                    </span>
                     <div>
                       <p className={`task-title ${isDone || isHelpState ? 'strike' : ''}`}>
-                        {task.title}
+                        <span className="task-title-text">{task.title}</span>
                       </p>
                       <p className="task-subtitle">{task.description || 'Small consistent progress.'}</p>
                     </div>
@@ -350,7 +368,7 @@ export default function Home() {
                 🎤
               </button>
 
-              <div className="wave-bars">
+              <div className={`wave-bars ${isRecording ? 'active' : ''}`}>
                 <span />
                 <span />
                 <span />
@@ -386,14 +404,7 @@ export default function Home() {
         </div>
       ) : null}
 
-      <div className="bottom-nav">
-        <Link className="bottom-nav-link active" to="/home">
-          Home
-        </Link>
-        <Link className="bottom-nav-link" to="/library">
-          Library
-        </Link>
-      </div>
+      <BottomNav />
     </div>
   )
 }

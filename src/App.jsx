@@ -5,6 +5,9 @@ import Signup from './pages/Signup'
 import Home from './pages/Home'
 import Admin from './pages/Admin'
 import LibraryConnection from './pages/LibraryConnection'
+import Journal from './pages/Journal'
+import Coach from './pages/Coach'
+import Progress from './pages/Progress'
 
 function App() {
   return (
@@ -16,7 +19,10 @@ function App() {
 
         <Route element={<ProtectedRoute allowRoles={['coachee']} />}>
           <Route path="/home" element={<Home />} />
+          <Route path="/journal" element={<Journal />} />
           <Route path="/library" element={<LibraryConnection />} />
+          <Route path="/coach" element={<Coach />} />
+          <Route path="/progress" element={<Progress />} />
         </Route>
 
         <Route element={<ProtectedRoute allowRoles={['coach', 'admin']} />}>
